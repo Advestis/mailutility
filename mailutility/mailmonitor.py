@@ -159,7 +159,7 @@ class MailMonitor(object):
     For a basic usage (monitoring one set of conditions and saving to one
     location) :
 
-    >>> from mailutils import MailMonitor  # doctest: +SKIP
+    >>> from mailutility import MailMonitor  # doctest: +SKIP
     >>> mail = MailMonitor("username")  # doctest: +SKIP
     >>> mail.monitor(  # doctest: +SKIP
     >>>     conditions={"subject": "test",  # doctest: +SKIP

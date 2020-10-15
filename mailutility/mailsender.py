@@ -26,7 +26,7 @@ class MailSender(object):
     Examples
     --------
 
-    >>> from mailutils import MailSender  # doctest: +SKIP
+    >>> from mailutility import MailSender  # doctest: +SKIP
     >>> from transparentpath import TransparentPath as Tp  # doctest: +SKIP
     >>> some_directory_path = Tp("gs://my_bucket/some_dir")  # doctest: +SKIP
     >>> # If the password is not provided, you will asked to provide it interactively

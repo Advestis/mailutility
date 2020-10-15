@@ -64,7 +64,7 @@ version = get_version()
 
 if __name__ == "__main__":
     setup(
-        name="mailutils",
+        name="mailutility",
         version=version,
         author="Philippe COTTE",
         author_email="pcotte@advestis.com",
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         description="A package containing a tool to send mail and a tool to monitor a mailbox easily",
         long_description=long_description,
         long_description_content_type="text/markdown",
-        url="https://github.com/Advestis/mailutils",
+        url="https://github.com/Advestis/mailutility",
         packages=find_packages(),
         install_requires=requirements,
         package_data={"": ["*", ".*"]},

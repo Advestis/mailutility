@@ -1,11 +1,11 @@
-# MailUtils
+# MailUtility
 
 A package containing a tool to send mail and a tool to monitor a mailbox easily.
 Supports remote directoris with transparentpath.
 
 ## Installation
 
-`pip install mailutils`
+`pip install mailutility`
 
 ## MailSender
 
@@ -15,7 +15,7 @@ double authentification method.
 ## Usage
 
 ```python
-from mailutils import MailSender
+from mailutility import MailSender
 from transparentpath import TransparentPath as Tp
 some_directory_path = Tp("gs://my_bucket/some_dir")
 # If the password is not provided, you will asked to provide it interactively
@@ -51,7 +51,7 @@ location) :
 
 ## Usage
 ```python
-from mailutils import MailMonitor
+from mailutility import MailMonitor
 mail = MailMonitor("username")
 mail.monitor(
     conditions={"subject": "test",
@@ -76,7 +76,7 @@ You can decide to save to GCS by using TransparentPath:
 ```python
 # noinspection PyShadowingNames, PyUnresolvedReferences
 from transparentpath import TransparentPath as Path
-from mailutils import MailMonitor
+from mailutility import MailMonitor
 Path.set_global_fs("gcs", bucket="my_bucket", project="my_project")
 mail = MailMonitor("tomonitor@mailbox.com")
 mail.monitor(
