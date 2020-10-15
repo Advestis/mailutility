@@ -1,4 +1,3 @@
 transparentpath
-smtplib
 email==6.0.0a1
 chardet==3.0.
