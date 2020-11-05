@@ -1,7 +1,7 @@
 # MailUtility
 
 A package containing a tool to send mail and a tool to monitor a mailbox easily.
-Supports remote directoris with transparentpath.
+Supports remote directories with transparentpath.
 
 ## Installation
 
