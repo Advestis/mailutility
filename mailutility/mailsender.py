@@ -8,7 +8,6 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
-from transparentpath import TransparentPath
 
 
 QUIT_ERROR = "Fail to quit"
@@ -20,8 +19,9 @@ class ConnectionFailed(Exception):
 
 class MailSender(object):
 
+    # noinspection PyUnresolvedReferences
     """Utils to send mails, supports attaching files. Only compatible with an sending account that does not use a
-    double authentification method.
+        double authentification method.
 
     Examples
     --------
@@ -39,7 +39,7 @@ class MailSender(object):
     >>>           some_directory_path / "some_other_file_name.csv"],  # doctest: +SKIP
     >>> )  # doctest: +SKIP
 
-    """
+        """
 
     hostname = ""
     default_mail = ""
@@ -186,12 +186,13 @@ class MailSender(object):
             MailSender.log(QUIT_ERROR, "debug")
         return True
 
+    # noinspection PyUnresolvedReferences
     def send_mail(
         self,
         adresses: Union[str, List],
         subject: str,
         text: str = "",
-        files: List[Union[TransparentPath, Path, str]] = None,
+        files: List[Union["TransparentPath", Path, str]] = None,
     ) -> bool:
         """Send a mail to a list of recepients. Can include files.
 

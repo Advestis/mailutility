@@ -10,7 +10,6 @@ import atexit
 import warnings
 
 from time import sleep, time
-from transparentpath import TransparentPath
 from pathlib import Path
 from typing import Union, List
 from datetime import datetime
@@ -46,8 +45,8 @@ def get_datetime_now(fmt: str = "%d%m%Y %H:%M:%S") -> str:
     return date.strftime(fmt)
 
 
-# noinspection PyBroadException
-def persist_file(filepath: TransparentPath, part) -> None:
+# noinspection PyBroadException, PyUnresolvedReferences
+def persist_file(filepath: "TransparentPath", part) -> None:
     """
 
     Parameters
@@ -67,14 +66,17 @@ def persist_file(filepath: TransparentPath, part) -> None:
     print(f"SAVING FILE to : {filepath}.")
 
 
-def rename_file(filename, to_path: TransparentPath, overwrite: bool = True) -> TransparentPath:
+# noinspection PyUnresolvedReferences
+def rename_file(
+    filename, to_path: Union[str, Path, "TransparentPath"], overwrite: bool = True
+) -> Union[Path, "TransparentPath"]:
     """
 
     Parameters
     ----------
     filename: str
 
-    to_path: TransparentPath
+    to_path: Union[str, Path, "TransparentPath"]
 
     overwrite: bool
         If True, will overwrite any file with the same name. Else rename it
@@ -83,19 +85,24 @@ def rename_file(filename, to_path: TransparentPath, overwrite: bool = True) -> T
 
     Returns
     -------
-    TransparentPath
+    Union[str, Path, "TransparentPath"]
 
     """
     date_ref = datetime.today()
 
-    filepath = to_path / filename
+    try:
+        filepath = to_path / filename
+    except TypeError:
+        to_path = Path(to_path)
+        filepath = to_path / filename
     ext = filepath.suffix
     if filepath.is_file() and overwrite is False:
-        filepath = TransparentPath(f"{to_path / filepath.stem}_{date_ref}{ext}")
+        filepath = type(to_path)(f"{to_path / filepath.stem}_{date_ref}{ext}")
     return filepath
 
 
-def save_attachment(part, to_path: Union[TransparentPath, Path, str], overwrite: bool = True,) -> None:
+# noinspection PyUnresolvedReferences
+def save_attachment(part, to_path: Union["TransparentPath", Path, str], overwrite: bool = True,) -> None:
     """
 
     Parameters
@@ -263,14 +270,15 @@ class MailMonitor(object):
                     print(f"Failed. Retrying for the {attempts}th time...")
                     sleep(1)
 
+    # noinspection PyUnresolvedReferences
     def monitor(
         self,
         conditions: Union[dict, List[dict]],
-        to_path: Union[Union[TransparentPath, Path, str], List[Union[TransparentPath, Path, str]], ],
+        to_path: Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]],
         time_to_sleep: Union[int, List[int]] = 60,
         mailbox: Union[str, List[str]] = "INBOX",
         overwrite: Union[bool, List[bool]] = None,
-        timeout: int = None
+        timeout: int = None,
     ) -> None:
         """
 
@@ -287,8 +295,7 @@ class MailMonitor(object):
 
                 3: sender : the sender email adress.
 
-        to_path: Union[Union[TransparentPath, Path, str], List[Union[
-        TransparentPath, Path, str]]]
+        to_path: Union[Union[TransparentPath, Path, str], List[Union[TransparentPath, Path, str]]]
             Where to save the attatchment. If is not a list, will use the
             same path for all monitoring conditions.
 
@@ -343,14 +350,15 @@ class MailMonitor(object):
         for arg in theargs:
             threading.Thread(target=MailMonitor._monitor, args=arg).start()
 
+    # noinspection PyUnresolvedReferences
     def _monitor(
         self,
         conditions: dict,
-        to_path: Union[TransparentPath, Path, str],
+        to_path: Union["TransparentPath", Path, str],
         time_to_sleep: int = 60,
         mailbox: str = "INBOX",
         overwrite: bool = None,
-        timeout: int = None
+        timeout: int = None,
     ) -> None:
         """
 
