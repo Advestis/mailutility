@@ -299,7 +299,7 @@ class MailMonitor(object):
         return str(date.day) + "-" + mv + "-" + str(date.year)
 
     @staticmethod
-    def read_date(date: str) -> datetime:
+    def read_date(date: str) -> datetime.date():
         """
         convert date from mail format for datetime
 
@@ -312,7 +312,7 @@ class MailMonitor(object):
 
         Returns
         -------
-
+        datetime.date
         """
         m_dict = {"01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun", "07": "Jul",
                   "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"}
@@ -321,7 +321,7 @@ class MailMonitor(object):
         month = m_dict[date[3:6]]
         year = date[7:11]
         date = datetime.strptime(year + "-" + month + "-" + day, "%Y-%m-%d")
-        return date
+        return date.date()
 
     def monitor(
             self,
@@ -475,6 +475,7 @@ class MailMonitor(object):
             if uid is None:
                 return False
             uid = uid[0]
+        # TODO (Aducourthial): add time sensitivity
         elif mode == "next":
             uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i < y else None))(dates, date)][0]
         elif mode == "last":
@@ -514,7 +515,22 @@ class MailMonitor(object):
                     ret[name] = data
         return ret
 
-    def list_dates(self, uids, invert: bool = False):
+    def list_dates(self, uids: list, invert: bool = False):
+        """
+        fetch intenal dates of list of uid
+        base > {uid : date}
+        inverted > {date : uids}
+
+        Parameters
+        ----------
+        uids: list
+        invert : bool
+                invert dict
+
+        Returns
+        -------
+        dict
+        """
         ret = {}
         for uid in uids:
             msg = self.mailbox.uid("FETCH", uid, "INTERNALDATE")
