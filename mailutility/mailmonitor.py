@@ -299,7 +299,7 @@ class MailMonitor(object):
         return str(date.day) + "-" + mv + "-" + str(date.year)
 
     @staticmethod
-    def read_date(date: str) -> datetime.date():
+    def read_date(date: str) -> datetime.date:
         """
         convert date from mail format for datetime
 
@@ -539,7 +539,8 @@ class MailMonitor(object):
             bi = ret.copy()
             ret = {}
             for i, j in bi.items():
-                j = j.date()
+                if isinstance(j, datetime):
+                    j = j.date()
                 if j not in ret.keys():
                     ret[j] = [i]
                 else:
