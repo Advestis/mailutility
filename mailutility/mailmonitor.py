@@ -299,7 +299,7 @@ class MailMonitor(object):
         return str(date.day) + "-" + mv + "-" + str(date.year)
 
     @staticmethod
-    def read_date(date: str) -> datetime.date():
+    def read_date(date: str) -> datetime.date:
         """
         convert date from mail format for datetime
 
@@ -412,7 +412,7 @@ class MailMonitor(object):
                        body: str = None,
                        date: Union[str, datetime, None] = None,
                        mailbox: Union[str, List[str]] = "INBOX",
-                       ) -> bool:
+                       ) -> Union[bool, tuple]:
         """
 
         Will fetch to attachments of a mail based on the date on arrival and the select mode
@@ -438,8 +438,8 @@ class MailMonitor(object):
 
         Returns
         -------
-        bool
-            True if successful else False
+        Union[bool, tuple]
+            True and mail date if successful else False
         """
         self.open_connection()
         self.mailbox.select(mailbox)
@@ -464,12 +464,14 @@ class MailMonitor(object):
         uids = self.mailbox.uid("SEARCH", None, base_req)[1]
         uids = list(map(lambda x: str(x)[2:-1], uids))
         uids = uids[0].split(" ")
-        if uids[0] == b'':
+        if uids[0] == '':
             return False
         dict_date = self.list_dates(uids, invert=True)
         dates = list(dict_date.keys())
         if date is None:
             date = datetime.now().date()
+        elif isinstance(date, str):
+            date = datetime.strptime(date,"%Y-%m-%d").date()
         if mode == "exact":
             uid = dict_date.get(date, None)
             if uid is None:
@@ -477,9 +479,9 @@ class MailMonitor(object):
             uid = uid[0]
         # TODO (Aducourthial): add time sensitivity
         elif mode == "next":
-            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i < y else None))(dates, date)][0]
+            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i < y else np.inf))(dates, date)][0]
         elif mode == "last":
-            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i > y else None))(dates, date)][0]
+            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i > y else np.inf))(dates, date)][0]
         elif mode == "nearest":
             uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y)))(dates, date)][0]
         else:
@@ -489,7 +491,7 @@ class MailMonitor(object):
             bp.mkdir()
         for i, j in self.fetch_attachment(uid).items():
             (bp / i).write_bytes(j)
-        return True
+        return True, self.list_dates([uid])[uid]
 
     def fetch_attachment(self, uid: str) -> dict:
         """
@@ -539,7 +541,6 @@ class MailMonitor(object):
             bi = ret.copy()
             ret = {}
             for i, j in bi.items():
-                j = j.date()
                 if j not in ret.keys():
                     ret[j] = [i]
                 else:
