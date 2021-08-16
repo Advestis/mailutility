@@ -36,7 +36,7 @@ jobs:
       - name: Push version
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.TOKEN_CICD }}
+          github_token: ${{ secrets.ORG_TOKEN_CICD }}
           branch: "master"
           force: true
       - name: make doc
@@ -51,7 +51,7 @@ jobs:
       - name: Push doc
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.TOKEN_CICD }}
+          github_token: ${{ secrets.ORG_TOKEN_CICD }}
           branch: "gh-pages"
           force: true
       - name: topypi
