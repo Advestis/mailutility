@@ -68,7 +68,7 @@ def persist_file(filepath: "TransparentPath", part) -> None:
 
 # noinspection PyUnresolvedReferences
 def rename_file(
-        filename, to_path: Union[str, Path, "TransparentPath"], overwrite: bool = True
+    filename, to_path: Union[str, Path, "TransparentPath"], overwrite: bool = True
 ) -> Union[Path, "TransparentPath"]:
     """
 
@@ -102,7 +102,7 @@ def rename_file(
 
 
 # noinspection PyUnresolvedReferences
-def save_attachment(part, to_path: Union["TransparentPath", Path, str], overwrite: bool = True, ) -> None:
+def save_attachment(part, to_path: Union["TransparentPath", Path, str], overwrite: bool = True) -> None:
     """
 
     Parameters
@@ -659,7 +659,6 @@ class MailMonitor(object):
         the_while(self, timeout)
 
     # noinspection PyUnresolvedReferences
-
     def send(self, msg):
         new_message = email.message.Message()
         new_message["From"] = f"{self.username}@{MailMonitor.default_mail}"
