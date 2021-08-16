@@ -102,7 +102,7 @@ def rename_file(
 
 
 # noinspection PyUnresolvedReferences
-def save_attachment(part, to_path: Union["TransparentPath", Path, str], overwrite: bool = True,) -> None:
+def save_attachment(part, to_path: Union["TransparentPath", Path, str], overwrite: bool = True) -> None:
     """
 
     Parameters
@@ -217,13 +217,13 @@ class MailMonitor(object):
     logger = None
 
     def __init__(
-        self,
-        username: str = None,
-        token: str = None,
-        port: int = 993,
-        hostname: str = "outlook.office365.com",
-        connect: bool = False,
-        overwrite: bool = True,
+            self,
+            username: str = None,
+            token: str = None,
+            port: int = 993,
+            hostname: str = "outlook.office365.com",
+            connect: bool = False,
+            overwrite: bool = True,
     ):
 
         if username is None:
@@ -270,15 +270,67 @@ class MailMonitor(object):
                     print(f"Failed. Retrying for the {attempts}th time...")
                     sleep(1)
 
-    # noinspection PyUnresolvedReferences
+    @staticmethod
+    def configure_date(date: Union[str, datetime]) -> str:
+        """
+        Converts datetime format to mail date format
+
+        > https://datatracker.ietf.org/doc/html/rfc3501 page 84/85
+
+        Parameters
+        ----------
+        date : Union[str, datetime]
+            date to convert
+
+        Returns
+        -------
+        str
+            converted date
+        """
+        if isinstance(date, str):
+            date = datetime.strptime(date, "%Y-%m-%d")
+        m_dict = {"01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun", "07": "Jul",
+                  "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"}
+        if len(str(date.month)) == 1:
+            m = "0" + str(date.month)
+        else:
+            m = str(date.month)
+        mv = m_dict[m]
+        return str(date.day) + "-" + mv + "-" + str(date.year)
+
+    @staticmethod
+    def read_date(date: str) -> datetime.date:
+        """
+        convert date from mail format for datetime
+
+        > https://datatracker.ietf.org/doc/html/rfc3501 page 84/85
+
+        Parameters
+        ----------
+        date : str
+            mail format
+
+        Returns
+        -------
+        datetime.date
+        """
+        m_dict = {"01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun", "07": "Jul",
+                  "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"}
+        day = date[:2]
+        m_dict = {i: j for i, j in zip(m_dict.values(), m_dict.keys())}
+        month = m_dict[date[3:6]]
+        year = date[7:11]
+        date = datetime.strptime(year + "-" + month + "-" + day, "%Y-%m-%d")
+        return date.date()
+
     def monitor(
-        self,
-        conditions: Union[dict, List[dict]],
-        to_path: Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]],
-        time_to_sleep: Union[int, List[int]] = 60,
-        mailbox: Union[str, List[str]] = "INBOX",
-        overwrite: Union[bool, List[bool]] = None,
-        timeout: int = None,
+            self,
+            conditions: Union[dict, List[dict]],
+            to_path: Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]],
+            time_to_sleep: Union[int, List[int]] = 60,
+            mailbox: Union[str, List[str]] = "INBOX",
+            overwrite: Union[bool, List[bool]] = None,
+            timeout: int = None,
     ) -> None:
         """
 
@@ -351,14 +403,158 @@ class MailMonitor(object):
             threading.Thread(target=MailMonitor._monitor, args=arg).start()
 
     # noinspection PyUnresolvedReferences
+    def fetch_one_mail(self,
+                       mode: str,
+                       save_dir: Union[str, Path],
+                       state: str = "ALL",
+                       subject: str = None,
+                       sender: str = None,
+                       body: str = None,
+                       date: Union[str, datetime, None] = None,
+                       mailbox: Union[str, List[str]] = "INBOX",
+                       ) -> Union[bool, tuple]:
+        """
+
+        Will fetch to attachments of a mail based on the date on arrival and the select mode
+
+        Parameters
+        ----------
+        subject : str
+
+        sender : str
+
+        state : str (SEEN, UNSEEN, ALL)
+
+        date : Union[str, datetime]
+
+        mode : str (last, next, nearest, exact)
+
+        to_path : Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]]
+
+        mailbox : Union[str, List[str]] = "INBOX"
+
+        overwrite : Union[bool, List[bool]] = None
+
+
+        Returns
+        -------
+        Union[bool, tuple]
+            True and mail date if successful else False
+        """
+        self.open_connection()
+        self.mailbox.select(mailbox)
+        base_req = ""
+        if subject is not None:
+            for i in split_spec_char(subject):
+                base_req += f'SUBJECT "{i}" '
+        if sender is not None:
+            base_req += f"FROM {sender} "
+        if body is not None:
+            base_req += f"BODY {body} "
+        if state != "ALL":
+            base_req += f"({state})"
+        if date is None:
+            base_req += f"ON {self.configure_date(datetime.now())}"
+        elif mode == "last":
+            base_req += f"BEFORE {self.configure_date(date)}"
+        elif mode == "next":
+            base_req += f"SINCE {self.configure_date(date)}"
+        elif mode == "on":
+            base_req += f"ON {self.configure_date(date)}"
+        uids = self.mailbox.uid("SEARCH", None, base_req)[1]
+        uids = list(map(lambda x: str(x)[2:-1], uids))
+        uids = uids[0].split(" ")
+        if uids[0] == '':
+            return False
+        dict_date = self.list_dates(uids, invert=True)
+        dates = list(dict_date.keys())
+        if date is None:
+            date = datetime.now().date()
+        elif isinstance(date, str):
+            date = datetime.strptime(date,"%Y-%m-%d").date()
+        if mode == "exact":
+            uid = dict_date.get(date, None)
+            if uid is None:
+                return False
+            uid = uid[0]
+        # TODO (Aducourthial): add time sensitivity
+        elif mode == "next":
+            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i < y else np.inf))(dates, date)][0]
+        elif mode == "last":
+            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i > y else np.inf))(dates, date)][0]
+        elif mode == "nearest":
+            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y)))(dates, date)][0]
+        else:
+            return False
+        bp = Path(save_dir)
+        if not bp.exists():
+            bp.mkdir()
+        for i, j in self.fetch_attachment(uid).items():
+            (bp / i).write_bytes(j)
+        return True, self.list_dates([uid])[uid]
+
+    def fetch_attachment(self, uid: str) -> dict:
+        """
+        will fetch attachments for one mail
+
+        Parameters
+        ----------
+        uid: str
+            uid of mail
+
+        Returns
+        -------
+        dict of file name : data as bytes
+        """
+        ret = {}
+        for part in email.message_from_string(
+                self.mailbox.uid("FETCH", uid, "(BODY.PEEK[])")[1][0][1].decode("ascii")).walk():
+            if part.get_content_maintype() != "multipart":
+                name = part.get_filename()
+                if name:
+                    name = name.replace("\r", "").replace("\n", "")
+                    data = part.get_payload(decode=True)
+                    ret[name] = data
+        return ret
+
+    def list_dates(self, uids: list, invert: bool = False):
+        """
+        fetch intenal dates of list of uid
+        base > {uid : date}
+        inverted > {date : uids}
+
+        Parameters
+        ----------
+        uids: list
+        invert : bool
+                invert dict
+
+        Returns
+        -------
+        dict
+        """
+        ret = {}
+        for uid in uids:
+            msg = self.mailbox.uid("FETCH", uid, "INTERNALDATE")
+            ret[uid] = self.read_date(msg[1][0].decode().split('"')[-2][:11])
+        if invert:
+            bi = ret.copy()
+            ret = {}
+            for i, j in bi.items():
+                if j not in ret.keys():
+                    ret[j] = [i]
+                else:
+                    ret[j].append(i)
+        return ret
+
     def _monitor(
-        self,
-        conditions: dict,
-        to_path: Union["TransparentPath", Path, str],
-        time_to_sleep: int = 60,
-        mailbox: str = "INBOX",
-        overwrite: bool = None,
-        timeout: int = None,
+            self,
+            conditions: dict,
+            to_path: Union["TransparentPath", Path, str],
+            time_to_sleep: int = 60,
+            mailbox: str = "INBOX",
+            overwrite: bool = None,
+            timeout: int = None,
     ) -> None:
         """
 
@@ -462,6 +658,7 @@ class MailMonitor(object):
 
         the_while(self, timeout)
 
+    # noinspection PyUnresolvedReferences
     def send(self, msg):
         new_message = email.message.Message()
         new_message["From"] = f"{self.username}@{MailMonitor.default_mail}"
