@@ -11,13 +11,14 @@ import warnings
 
 from time import sleep, time
 from pathlib import Path
+import numpy as np
 from typing import Union, List
 from datetime import datetime
 import threading
 
 
 class MailException(Exception):
-    """ Any kind of mail error """
+    """Any kind of mail error"""
 
     def __init__(self, msg: str = None):
         self.message = msg or "There is a problem with the mails..."
@@ -217,13 +218,13 @@ class MailMonitor(object):
     logger = None
 
     def __init__(
-            self,
-            username: str = None,
-            token: str = None,
-            port: int = 993,
-            hostname: str = "outlook.office365.com",
-            connect: bool = False,
-            overwrite: bool = True,
+        self,
+        username: str = None,
+        token: str = None,
+        port: int = 993,
+        hostname: str = "outlook.office365.com",
+        connect: bool = False,
+        overwrite: bool = True,
     ):
 
         if username is None:
@@ -289,8 +290,20 @@ class MailMonitor(object):
         """
         if isinstance(date, str):
             date = datetime.strptime(date, "%Y-%m-%d")
-        m_dict = {"01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun", "07": "Jul",
-                  "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"}
+        m_dict = {
+            "01": "Jan",
+            "02": "Feb",
+            "03": "Mar",
+            "04": "Apr",
+            "05": "May",
+            "06": "Jun",
+            "07": "Jul",
+            "08": "Aug",
+            "09": "Sep",
+            "10": "Oct",
+            "11": "Nov",
+            "12": "Dec",
+        }
         if len(str(date.month)) == 1:
             m = "0" + str(date.month)
         else:
@@ -314,8 +327,20 @@ class MailMonitor(object):
         -------
         datetime.date
         """
-        m_dict = {"01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun", "07": "Jul",
-                  "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec"}
+        m_dict = {
+            "01": "Jan",
+            "02": "Feb",
+            "03": "Mar",
+            "04": "Apr",
+            "05": "May",
+            "06": "Jun",
+            "07": "Jul",
+            "08": "Aug",
+            "09": "Sep",
+            "10": "Oct",
+            "11": "Nov",
+            "12": "Dec",
+        }
         day = date[:2]
         m_dict = {i: j for i, j in zip(m_dict.values(), m_dict.keys())}
         month = m_dict[date[3:6]]
@@ -324,13 +349,13 @@ class MailMonitor(object):
         return date.date()
 
     def monitor(
-            self,
-            conditions: Union[dict, List[dict]],
-            to_path: Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]],
-            time_to_sleep: Union[int, List[int]] = 60,
-            mailbox: Union[str, List[str]] = "INBOX",
-            overwrite: Union[bool, List[bool]] = None,
-            timeout: int = None,
+        self,
+        conditions: Union[dict, List[dict]],
+        to_path: Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]],
+        time_to_sleep: Union[int, List[int]] = 60,
+        mailbox: Union[str, List[str]] = "INBOX",
+        overwrite: Union[bool, List[bool]] = None,
+        timeout: int = None,
     ) -> None:
         """
 
@@ -403,43 +428,36 @@ class MailMonitor(object):
             threading.Thread(target=MailMonitor._monitor, args=arg).start()
 
     # noinspection PyUnresolvedReferences
-    def fetch_one_mail(self,
-                       mode: str,
-                       save_dir: Union[str, Path],
-                       state: str = "ALL",
-                       subject: str = None,
-                       sender: str = None,
-                       body: str = None,
-                       date: Union[str, datetime, None] = None,
-                       mailbox: Union[str, List[str]] = "INBOX",
-                       ) -> Union[bool, tuple]:
+    def fetch_one_mail(
+        self,
+        mode: str,
+        save_dir: Union[str, Path],
+        state: str = "ALL",
+        subject: str = None,
+        sender: str = None,
+        body: str = None,
+        date: Union[str, datetime, None] = None,
+        mailbox: Union[str, List[str]] = "INBOX",
+    ) -> Union[bool, tuple]:
         """
 
         Will fetch to attachments of a mail based on the date on arrival and the select mode
 
         Parameters
         ----------
-        subject : str
-
-        sender : str
-
-        state : str (SEEN, UNSEEN, ALL)
-
-        date : Union[str, datetime]
-
         mode : str (last, next, nearest, exact)
-
-        to_path : Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]]
-
+        save_dir : Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]]
+        state : str (SEEN, UNSEEN, ALL)
+        subject : str
+        sender : str
+        body : str
+        date : Union[str, datetime]
         mailbox : Union[str, List[str]] = "INBOX"
-
-        overwrite : Union[bool, List[bool]] = None
-
 
         Returns
         -------
         Union[bool, tuple]
-            True and mail date if successful else False
+            True and mail date if successful else False, None
         """
         self.open_connection()
         self.mailbox.select(mailbox)
@@ -464,28 +482,28 @@ class MailMonitor(object):
         uids = self.mailbox.uid("SEARCH", None, base_req)[1]
         uids = list(map(lambda x: str(x)[2:-1], uids))
         uids = uids[0].split(" ")
-        if uids[0] == '':
-            return False
+        if uids[0] == "":
+            return False, None
         dict_date = self.list_dates(uids, invert=True)
         dates = list(dict_date.keys())
         if date is None:
             date = datetime.now().date()
         elif isinstance(date, str):
-            date = datetime.strptime(date,"%Y-%m-%d").date()
+            date = datetime.strptime(date, "%Y-%m-%d").date()
         if mode == "exact":
             uid = dict_date.get(date, None)
             if uid is None:
-                return False
+                return False, None
             uid = uid[0]
         # TODO (Aducourthial): add time sensitivity
         elif mode == "next":
-            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i < y else np.inf))(dates, date)][0]
+            uid = dict_date[(lambda x, y: min(x, key=lambda d: abs(d - y) if d < y else np.inf))(dates, date)][0]
         elif mode == "last":
-            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y) if i > y else np.inf))(dates, date)][0]
+            uid = dict_date[(lambda x, y: min(x, key=lambda d: abs(d - y) if d > y else np.inf))(dates, date)][0]
         elif mode == "nearest":
-            uid = dict_date[(lambda x, y: min(x, key=lambda i: abs(i - y)))(dates, date)][0]
+            uid = dict_date[(lambda x, y: min(x, key=lambda d: abs(d - y)))(dates, date)][0]
         else:
-            return False
+            return False, None
         bp = Path(save_dir)
         if not bp.exists():
             bp.mkdir()
@@ -508,7 +526,8 @@ class MailMonitor(object):
         """
         ret = {}
         for part in email.message_from_string(
-                self.mailbox.uid("FETCH", uid, "(BODY.PEEK[])")[1][0][1].decode("ascii")).walk():
+            self.mailbox.uid("FETCH", uid, "(BODY.PEEK[])")[1][0][1].decode("ascii")
+        ).walk():
             if part.get_content_maintype() != "multipart":
                 name = part.get_filename()
                 if name:
@@ -548,13 +567,13 @@ class MailMonitor(object):
         return ret
 
     def _monitor(
-            self,
-            conditions: dict,
-            to_path: Union["TransparentPath", Path, str],
-            time_to_sleep: int = 60,
-            mailbox: str = "INBOX",
-            overwrite: bool = None,
-            timeout: int = None,
+        self,
+        conditions: dict,
+        to_path: Union["TransparentPath", Path, str],
+        time_to_sleep: int = 60,
+        mailbox: str = "INBOX",
+        overwrite: bool = None,
+        timeout: int = None,
     ) -> None:
         """
 
@@ -666,7 +685,10 @@ class MailMonitor(object):
         new_message.set_payload(msg)
         self.open_connection()
         self.mailbox.append(
-            "INBOX", "", imaplib.Time2Internaldate(time()), str(new_message).encode(),
+            "INBOX",
+            "",
+            imaplib.Time2Internaldate(time()),
+            str(new_message).encode(),
         )
         if not self.mailbox.state == "LOGOUT":
             self.mailbox.select()
