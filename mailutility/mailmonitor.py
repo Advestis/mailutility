@@ -12,9 +12,12 @@ import warnings
 from time import sleep, time
 from pathlib import Path
 import numpy as np
-from typing import Union, List
+from typing import Union, List, Dict, Optional
 from datetime import datetime
 import threading
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MailException(Exception):
@@ -348,6 +351,7 @@ class MailMonitor(object):
         date = datetime.strptime(year + "-" + month + "-" + day, "%Y-%m-%d")
         return date.date()
 
+    # noinspection PyUnresolvedReferences
     def monitor(
         self,
         conditions: Union[dict, List[dict]],
@@ -427,89 +431,30 @@ class MailMonitor(object):
         for arg in theargs:
             threading.Thread(target=MailMonitor._monitor, args=arg).start()
 
-    # noinspection PyUnresolvedReferences
     def fetch_one_mail(
         self,
-        mode: str,
         save_dir: Union[str, Path],
-        state: str = "ALL",
-        subject: str = None,
-        sender: str = None,
-        body: str = None,
+        state: Optional[str] = "ALL",
+        subject: Optional[str] = None,
+        sender: Optional[str] = None,
+        body: Optional[str] = None,
         date: Union[str, datetime, None] = None,
         mailbox: Union[str, List[str]] = "INBOX",
+        modes: Dict[str, str] = None
     ) -> Union[bool, tuple]:
-        """
-
-        Will fetch to attachments of a mail based on the date on arrival and the select mode
-
-        Parameters
-        ----------
-        mode : str (last, next, nearest, exact)
-        save_dir : Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]]
-        state : str (SEEN, UNSEEN, ALL)
-        subject : str
-        sender : str
-        body : str
-        date : Union[str, datetime]
-        mailbox : Union[str, List[str]] = "INBOX"
-
-        Returns
-        -------
-        Union[bool, tuple]
-            True and mail date if successful else False, None
-        """
-        self.open_connection()
-        self.mailbox.select(mailbox)
-        base_req = ""
-        if subject is not None:
-            for i in split_spec_char(subject):
-                base_req += f'SUBJECT "{i}" '
-        if sender is not None:
-            base_req += f"FROM {sender} "
-        if body is not None:
-            base_req += f"BODY {body} "
-        if state != "ALL":
-            base_req += f"({state})"
-        if date is None:
-            base_req += f"ON {self.configure_date(datetime.now())}"
-        elif mode == "last":
-            base_req += f"BEFORE {self.configure_date(date)}"
-        elif mode == "next":
-            base_req += f"SINCE {self.configure_date(date)}"
-        elif mode == "on":
-            base_req += f"ON {self.configure_date(date)}"
-        uids = self.mailbox.uid("SEARCH", None, base_req)[1]
-        uids = list(map(lambda x: str(x)[2:-1], uids))
-        uids = uids[0].split(" ")
-        if uids[0] == "":
-            return False, None
-        dict_date = self.list_dates(uids, invert=True)
-        dates = list(dict_date.keys())
-        if date is None:
-            date = datetime.now().date()
-        elif isinstance(date, str):
-            date = datetime.strptime(date, "%Y-%m-%d").date()
-        if mode == "exact":
-            uid = dict_date.get(date, None)
-            if uid is None:
-                return False, None
-            uid = uid[0]
-        # TODO (Aducourthial): add time sensitivity
-        elif mode == "next":
-            uid = dict_date[(lambda x, y: min(x, key=lambda d: abs(d - y) if d < y else np.inf))(dates, date)][0]
-        elif mode == "last":
-            uid = dict_date[(lambda x, y: min(x, key=lambda d: abs(d - y) if d > y else np.inf))(dates, date)][0]
-        elif mode == "nearest":
-            uid = dict_date[(lambda x, y: min(x, key=lambda d: abs(d - y)))(dates, date)][0]
-        else:
-            return False, None
-        bp = Path(save_dir)
-        if not bp.exists():
-            bp.mkdir()
-        for i, j in self.fetch_attachment(uid).items():
-            (bp / i).write_bytes(j)
-        return True, self.list_dates([uid])[uid]
+        if modes is None:
+            modes = {"start": "exact", "end": "exact"}
+        return self.fetch_mails(
+            save_dir=save_dir,
+            state=state,
+            subject=subject,
+            sender=sender,
+            body=body,
+            start_date=date,
+            end_date=date,
+            mailbox=mailbox,
+            modes=modes
+        )
 
     def fetch_attachment(self, uid: str) -> dict:
         """
@@ -536,6 +481,127 @@ class MailMonitor(object):
                     ret[name] = data
         return ret
 
+    def fetch_mails(
+            self,
+            save_dir: Union[str, Path],
+            state: Optional[str] = "ALL",
+            subject: Optional[str] = None,
+            sender: Optional[str] = None,
+            body: Optional[str] = None,
+            start_date: Union[str, datetime, None] = None,
+            end_date: Union[str, datetime, None] = None,
+            mailbox: Union[str, List[str]] = "INBOX",
+            modes: Dict[str, str] = None
+    ):
+        """
+        Will fetch to attachments of mails based on the dates on arrival and the select modes
+
+        Parameters
+        ----------
+        save_dir : Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]]
+        state : str = "ALL" (SEEN, UNSEEN, ALL)
+        subject : Optional[str]
+        sender : Optional[str]
+        body : Optional[str]
+        start_date : Optional[str, datetime]
+        end_date : Optional[str, datetime]
+        mailbox : Union[str, List[str]] = "INBOX"
+        modes : Dict[str, str] = {"start": "exact", "end": "exact"}
+            keys are 'start' and 'end', values can be 'exact', 'nearest', 'next', 'last'
+
+        Returns
+        -------
+        tuple
+            True and mails dates if successful else False, None
+        """
+        if modes is None:
+            modes = {"start": "exact", "end": "exact"}
+        modes = {k: modes[k] for k in modes if k in ("start", "end")}
+        if "start" not in modes:
+            modes["start"] = "exact"
+        if "end" not in modes:
+            modes["end"] = "exact"
+        self.open_connection()
+        self.mailbox.select(mailbox)
+        base_req = ""
+        if subject is not None:
+            for i in split_spec_char(subject):
+                base_req += f'SUBJECT "{i}" '
+        if sender is not None:
+            base_req += f"FROM {sender} "
+        if body is not None:
+            base_req += f"BODY {body} "
+        if state != "ALL":
+            base_req += f"({state}) "
+        if start_date is None and end_date is None:
+            base_req += f"ON {self.configure_date(datetime.now())} "
+        elif start_date is not None and end_date is not None:
+            start_date_s = self.configure_date(start_date)
+            end_date_s = self.configure_date(end_date)
+            if end_date_s == start_date_s:
+                base_req += f"ON {start_date_s} "
+            else:
+                base_req += f"SINCE {start_date_s} "
+                base_req += f"BEFORE {end_date_s} "
+        elif start_date is not None:
+            base_req += f"SINCE {self.configure_date(start_date)} "
+        elif end_date is not None:
+            base_req += f"BEFORE {self.configure_date(end_date)} "
+        if base_req.endswith(" "):
+            base_req = base_req[:-1]
+        uids = self.mailbox.uid("SEARCH", None, base_req)[1]
+        uids = list(map(lambda x: str(x)[2:-1], uids))
+        uids = uids[0].split(" ")
+        if uids[0] == "":
+            return False, None
+        dict_date = self.list_dates(uids, invert=True)
+        dates = list(dict_date.keys())
+
+        def get_date(d_, m_, default):
+            if m_ == "exact" and d_ is not None:
+                selected_ = dict_date.get(d_, None)
+                if selected_ is None:
+                    return False, None
+                else:
+                    selected_ = d_
+            # TODO (Aducourthial): add time sensitivity
+            elif m_ == "next" and d_ is not None:
+                selected_ = (lambda x, y: min(x, key=lambda d: abs(d - y) if d < y else np.inf))(dates, d_)
+            elif m_ == "last" and d_ is not None:
+                selected_ = (lambda x, y: min(x, key=lambda d: abs(d - y) if d > y else np.inf))(dates, d_)
+            elif m_ == "nearest" and d_ is not None:
+                selected_ = (lambda x, y: min(x, key=lambda d: abs(d - y)))(dates, d_)
+            elif d_ is not None:
+                raise ValueError(f"Invalid mode {m_}")
+            else:
+                selected_ = dict_date.get(default, None)
+                if selected_ is None:
+                    return False, None
+                else:
+                    selected_ = d_
+            return selected_
+
+        best_start_date = get_date(start_date, modes["start"], dates[-1])
+        best_end_date = get_date(end_date, modes["end"], dates[0])
+        good_dates = [d for d in dates if (d >= best_start_date) and (d <= best_end_date)]
+        good_dates.sort()
+
+        bp = Path(save_dir)
+        if not bp.exists():
+            bp.mkdir()
+        for date in good_dates:
+            # If several mails arrived on the same day, only the last one is kept
+            uid = dict_date[date][-1]
+            bps = bp
+            if len(good_dates) > 1:
+                logger.info(f"Found mail on {date}")
+                bps = bp / date.strftime('%Y-%m-%d')
+                if not bps.exists():
+                    bps.mkdir()
+            for i, j in self.fetch_attachment(uid).items():
+                (bps / i).write_bytes(j)
+        return True, good_dates
+
     def list_dates(self, uids: list, invert: bool = False):
         """
         fetch intenal dates of list of uid
@@ -552,6 +618,10 @@ class MailMonitor(object):
         -------
         dict
         """
+
+        if not isinstance(uids, list):
+            uids = [uids]
+
         ret = {}
         for uid in uids:
             msg = self.mailbox.uid("FETCH", uid, "INTERNALDATE")
@@ -566,6 +636,7 @@ class MailMonitor(object):
                     ret[j].append(i)
         return ret
 
+    # noinspection PyUnresolvedReferences
     def _monitor(
         self,
         conditions: dict,
