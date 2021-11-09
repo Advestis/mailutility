@@ -491,7 +491,8 @@ class MailMonitor(object):
             start_date: Union[str, datetime, None] = None,
             end_date: Union[str, datetime, None] = None,
             mailbox: Union[str, List[str]] = "INBOX",
-            modes: Dict[str, str] = None
+            modes: Dict[str, str] = None,
+            duplicated: str = "last"
     ):
         """
         Will fetch to attachments of mails based on the dates on arrival and the select modes
@@ -508,6 +509,8 @@ class MailMonitor(object):
         mailbox : Union[str, List[str]] = "INBOX"
         modes : Dict[str, str] = {"start": "exact", "end": "exact"}
             keys are 'start' and 'end', values can be 'exact', 'nearest', 'next', 'last'
+        duplicated : str = "last" ("first", "last", "all")
+            What to do if there are several mails the same day
 
         Returns
         -------
@@ -589,17 +592,33 @@ class MailMonitor(object):
         bp = Path(save_dir)
         if not bp.exists():
             bp.mkdir()
+
+        def save_one(path, uid_):
+            if not path.exists():
+                path.mkdir()
+            for i_, j_ in self.fetch_attachment(uid_).items():
+                (path / i_).write_bytes(j_)
+
         for date in good_dates:
-            # If several mails arrived on the same day, only the last one is kept
-            uid = dict_date[date][-1]
+            if len(dict_date[date]) > 1:
+                if duplicated == "last":
+                    uid = [dict_date[date][-1]]
+                elif duplicated == "first":
+                    uid = [dict_date[date][0]]
+                else:
+                    uid = [dict_date[date]]
+            else:
+                uid = [dict_date[date][0]]
+
             bps = bp
             if len(good_dates) > 1:
-                logger.info(f"Found mail on {date}")
+                logger.info(f"Found {len(uid)} mail(s) on {date}")
                 bps = bp / date.strftime('%Y-%m-%d')
-                if not bps.exists():
-                    bps.mkdir()
-            for i, j in self.fetch_attachment(uid).items():
-                (bps / i).write_bytes(j)
+            if len(uid) > 1:
+                for i in range(len(uid)):
+                    save_one(bps.append(f"_{i}"), uid[i])
+            else:
+                save_one(bps, uid[0])
         return True, good_dates
 
     def list_dates(self, uids: list, invert: bool = False):
