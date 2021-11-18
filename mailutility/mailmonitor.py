@@ -7,14 +7,13 @@ import sys
 import traceback
 import socket
 import atexit
-import warnings
 
 from time import sleep, time
 from pathlib import Path
 import numpy as np
 from typing import Union, List, Dict, Optional
 from datetime import datetime
-import threading
+from multiprocessing.pool import ThreadPool
 import logging
 
 logger = logging.getLogger(__name__)
@@ -67,7 +66,7 @@ def persist_file(filepath: "TransparentPath", part) -> None:
     """
     data = part.get_payload(decode=True)
     filepath.write_bytes(data)
-    print(f"SAVING FILE to : {filepath}.")
+    logger.info(f"SAVING FILE to : {filepath}.")
 
 
 # noinspection PyUnresolvedReferences
@@ -218,7 +217,6 @@ class MailMonitor(object):
     accepted_conditions = ["sender", "subject", "subject_exact"]
     instances = []
     default_mail = ""
-    logger = None
 
     def __init__(
         self,
@@ -228,6 +226,7 @@ class MailMonitor(object):
         hostname: str = "outlook.office365.com",
         connect: bool = False,
         overwrite: bool = True,
+        max_threads: int = None,
     ):
 
         if username is None:
@@ -244,6 +243,8 @@ class MailMonitor(object):
         self.mailbox = None
         self.exit = False
         self.overwrite = overwrite
+        self.max_threads = max_threads
+        self.pool = None
         if connect:
             self.open_connection()
         MailMonitor.instances.append(self)
@@ -253,7 +254,7 @@ class MailMonitor(object):
         # Connection to the server
         talk = False
         if self.mailbox is None:
-            print(f"Connecting to {self.hostname} as {self.username}...")
+            logger.info(f"Connecting to {self.hostname} as {self.username}...")
             talk = True
         attempts = 0
         while True:
@@ -264,14 +265,14 @@ class MailMonitor(object):
                 self.mailbox.login(self.username, self.token)
                 self.mailbox.select()
                 if talk:
-                    print("...successful")
+                    logger.info("...successful")
                 break
             except socket.gaierror as e:
-                print(f"Failed more than {attempts} times. Raising the exception.")
+                logger.info(f"Failed more than {attempts} times. Raising the exception.")
                 if attempts > 60:
                     raise e
                 else:
-                    print(f"Failed. Retrying for the {attempts}th time...")
+                    logger.info(f"Failed. Retrying for the {attempts}th time...")
                     sleep(1)
 
     @staticmethod
@@ -423,13 +424,22 @@ class MailMonitor(object):
             raise ValueError("mailbox and conditions must have same length")
         theargs = []
         for i in range(len(conditions)):
-            theargs.append((self, conditions[i], to_path[i], time_to_sleep[i], mailbox[i], overwrite[i], timeout))
+            theargs.append((conditions[i], to_path[i], time_to_sleep[i], mailbox[i], overwrite[i], timeout))
 
-        print("Will start monitoring for new emails. You can stop the monitoring at any moment by pressing 'CTRL+C'.")
+        logger.info("Will start monitoring for new emails. You can stop the monitoring at any moment by pressing "
+                    "'CTRL+C'.")
         if timeout is not None:
-            print(f"Monitoring will remain up for {timeout} seconds then will shut down.")
-        for arg in theargs:
-            threading.Thread(target=MailMonitor._monitor, args=arg).start()
+            logger.info(f"Monitoring will remain up for {timeout} seconds then will shut down.")
+
+        if self.pool is None:
+            self.pool = ThreadPool(self.max_threads)
+        self.pool.starmap(self._monitor, theargs)
+
+    def stop_monitoring(self):
+        if self.pool is None:
+            return
+        self.pool.close()
+        self.pool.terminate()
 
     def fetch_one_mail(
         self,
@@ -708,7 +718,7 @@ class MailMonitor(object):
                 raise KeyError(f"Condition {condition} not valid")
             s += f"  - '{condition}' = {conditions[condition]}\n"
         s += f"Will save the attachment in {to_path}"
-        print(s)
+        logger.info(s)
 
         def the_while(shelf: MailMonitor, t: int):
             t0 = time()
@@ -741,12 +751,12 @@ class MailMonitor(object):
                         # noinspection PyUnresolvedReferences
                         email_body = msg_data[0][1]
                     else:
-                        MailMonitor.log("Triggered on an empty mail?!", "warning")
+                        logger.warning("Triggered on an empty mail?!")
                     encoding = chardet.detect(email_body)["encoding"]
                     email_body = email_body.decode(encoding)
                     mail = email.message_from_string(email_body)
 
-                    print(
+                    logger.info(
                         f"Triggered at {get_datetime_now()} on mail "
                         f"subject '{mail['Subject']}'"
                         f" from '{mail['From']}'"
@@ -754,7 +764,7 @@ class MailMonitor(object):
                     for part in mail.walk():
                         save_attachment(part, to_path, overwrite)
                     _, _ = shelf.mailbox.uid("FETCH", uid, "(RFC822)")
-                    print("Finished reading the mail")
+                    logger.info("Finished reading the mail")
                 if not shelf.mailbox.state == "LOGOUT":
                     shelf.mailbox.select()
                     shelf.mailbox.close()
@@ -762,7 +772,7 @@ class MailMonitor(object):
                 # Verification toutes les x secondes
                 sleep(time_to_sleep)
                 if t is not None and time() - t0 > t:
-                    print(f"Requested run time of {t} completed. Exiting...")
+                    logger.info(f"Requested run time of {t} completed. Exiting...")
                     break
 
         the_while(self, timeout)
@@ -784,22 +794,7 @@ class MailMonitor(object):
             self.mailbox.select()
             self.mailbox.close()
             self.mailbox.logout()
-        print(f"Sent warning message to {self.username}@{MailMonitor.default_mail}")
-
-    @classmethod
-    def log(cls, message, type_):
-        if cls.logger is None:
-            if type_ == "error" or type_ == "critical":
-                if isinstance(message, BaseException):
-                    raise message
-                else:
-                    raise ValueError(message)
-            elif type_ == "warning":
-                warnings.warn(message)
-            else:
-                print(message)
-        else:
-            getattr(cls.logger, type_)(message)
+        logger.info(f"Sent warning message to {self.username}@{MailMonitor.default_mail}")
 
 
 _excepthook = getattr(sys, "excepthook")
@@ -815,8 +810,9 @@ def clean():
                 mm.mailbox.close()
                 mm.mailbox.logout()
         except Exception as e:
-            MailMonitor.log("Failed to close the mailbox:", "warning")
-            MailMonitor.log(e, "warning")
+            logger.warning("Failed to close the mailbox:")
+            logger.warning(e)
+        mm.stop_monitoring()
     del MailMonitor.instances
 
 

@@ -1,6 +1,5 @@
 import getpass
 import smtplib
-import warnings
 from typing import Union, List
 from pathlib import Path
 from email import encoders
@@ -8,6 +7,9 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 QUIT_ERROR = "Fail to quit"
@@ -43,7 +45,6 @@ class MailSender(object):
 
     hostname = ""
     default_mail = ""
-    logger = None
 
     def __init__(self, sender: str = None, passwd: str = None, do_raise: bool = True):
         """
@@ -87,8 +88,8 @@ class MailSender(object):
                 if self.do_raise:
                     raise ValueError("You must specify the histname attribute of MailSender (like "
                                      "outlook.office365.com for example)")
-                MailSender.log("You must specify the histname attribute of MailSender (like outlook.office365.com for "
-                               "example)", "error")
+                logger.error("You must specify the histname attribute of MailSender (like outlook.office365.com for "
+                             "example)")
                 return False
 
             try:
@@ -99,7 +100,7 @@ class MailSender(object):
             except Exception as e:
                 if self.do_raise:
                     raise e
-                MailSender.log(e, "error")
+                logger.error(e)
                 return False
             return True
         else:
@@ -115,7 +116,7 @@ class MailSender(object):
                     if self.do_raise:
                         raise ConnectionFailed
                     return False
-                MailSender.log("The address you specified is not a valid Advestis email", "error")
+                logger.error("The address you specified is not a valid Advestis email")
                 self.sender = input("email adress:\r\n")
 
             if self.passwd is None:
@@ -131,7 +132,7 @@ class MailSender(object):
             except Exception as e:
                 if self.do_raise:
                     raise e
-                MailSender.log(e, "error")
+                logger.error(e)
                 return False
             # login to server
             attempt = 0
@@ -145,8 +146,8 @@ class MailSender(object):
                         if self.do_raise:
                             raise ConnectionFailed
                         return False
-                    MailSender.log(e, "error")
-                    MailSender.log("Identificatin failed. Try again!", "error")
+                    logger.error(e)
+                    logger.error("Identificatin failed. Try again!")
                     self.sender = input("email adress or username:\r\n")
                     if "@" not in self.sender:
                         self.sender += f"@{MailSender.default_mail}"
@@ -157,7 +158,7 @@ class MailSender(object):
                             if self.do_raise:
                                 raise ConnectionFailed
                             return False
-                        MailSender.log("The adress you specified is not a valid Advestis email", "error")
+                        logger.error("The adress you specified is not a valid Advestis email")
                         self.sender = input("email adress:\r\n")
                     self.passwd = getpass.getpass("Password:\r\n")
         return True
@@ -178,12 +179,12 @@ class MailSender(object):
         if not logged_in or self.smtp is None:
             return False
 
-        print("Connection successful!\n")
+        logger.info("Connection successful!\n")
         # noinspection PyBroadException
         try:
             self.smtp.quit()
         except Exception:
-            MailSender.log(QUIT_ERROR, "debug")
+            logger.debug(QUIT_ERROR)
         return True
 
     # noinspection PyUnresolvedReferences
@@ -228,7 +229,7 @@ class MailSender(object):
         try:
             self.smtp.quit()
         except Exception:
-            MailSender.log(QUIT_ERROR, "debug")
+            logger.debug(QUIT_ERROR)
 
         if not self.set_mail_server():
             return False
@@ -252,37 +253,22 @@ class MailSender(object):
         refused = self.smtp.sendmail(self.sender, adresses, message.as_string())
         accepted = [item for item in adresses if item not in refused]
 
-        print("Mail successfully sent to:")
+        logger.info("Mail successfully sent to:")
 
         if len(accepted) == 0:
-            print("No one!")
+            logger.info("No one!")
             return False
         else:
             for item in accepted:
-                print(item)
+                logger.info(item)
 
         if len(refused) > 0:
-            MailSender.log("  Mail failed to be sent to:", "error")
+            logger.error("  Mail failed to be sent to:")
             for item in refused:
-                MailSender.log(f"{item} because {refused[item]}", "error")
+                logger.error(f"{item} because {refused[item]}")
         # noinspection PyBroadException
         try:
             self.smtp.quit()
         except Exception:
-            MailSender.log(QUIT_ERROR, "debug")
+            logger.debug(QUIT_ERROR)
         return True
-
-    @classmethod
-    def log(cls, message, type_):
-        if cls.logger is None:
-            if type_ == "error" or type_ == "critical":
-                if isinstance(message, BaseException):
-                    raise message
-                else:
-                    raise ValueError(message)
-            elif type_ == "warning":
-                warnings.warn(message)
-            else:
-                print(message)
-        else:
-            getattr(cls.logger, type_)(message)
