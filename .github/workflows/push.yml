@@ -64,7 +64,7 @@ jobs:
       - name: todocker
         uses: docker/build-push-action@v1
         with:
-          username: ${{ secrets.docker_login }}
-          password: ${{ secrets.docker_passwd }}
+          username: ${{ secrets.ORG_DOCKER_LOGIN }}
+          password: ${{ secrets.ORG_DOCKER_PASSWD }}
           repository: advestisrepositories/mailutility
           tag_with_ref: true
