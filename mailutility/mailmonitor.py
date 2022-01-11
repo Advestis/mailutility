@@ -14,7 +14,7 @@ from time import sleep, time
 from pathlib import Path
 import numpy as np
 from typing import Union, List, Dict, Optional
-from datetime import datetime, date
+from datetime import datetime, date as ddate
 from multiprocessing.pool import ThreadPool
 import logging
 
@@ -450,7 +450,7 @@ class MailMonitor(object):
         subject: Optional[str] = None,
         sender: Optional[str] = None,
         body: Optional[str] = None,
-        d: Union[str, datetime, date, None] = None,
+        date: Union[str, datetime, ddate, None] = None,
         mailbox: Union[str, List[str]] = "INBOX",
         modes: Dict[str, str] = None
     ) -> Union[bool, tuple]:
@@ -462,8 +462,8 @@ class MailMonitor(object):
             subject=subject,
             sender=sender,
             body=body,
-            start_date=d,
-            end_date=d,
+            start_date=date,
+            end_date=date,
             mailbox=mailbox,
             modes=modes
         )
@@ -494,17 +494,17 @@ class MailMonitor(object):
         return ret
 
     def fetch_mails(
-            self,
-            save_dir: Union[str, Path, TransparentPath],
-            state: Optional[str] = "ALL",
-            subject: Optional[str] = None,
-            sender: Optional[str] = None,
-            body: Optional[str] = None,
-            start_date: Union[str, datetime, None] = None,
-            end_date: Union[str, datetime, None] = None,
-            mailbox: Union[str, List[str]] = "INBOX",
-            modes: Dict[str, str] = None,
-            duplicated: str = "last"
+        self,
+        save_dir: Union[str, Path, TransparentPath],
+        state: Optional[str] = "ALL",
+        subject: Optional[str] = None,
+        sender: Optional[str] = None,
+        body: Optional[str] = None,
+        start_date: Union[str, datetime, None] = None,
+        end_date: Union[str, datetime, None] = None,
+        mailbox: Union[str, List[str]] = "INBOX",
+        modes: Dict[str, str] = None,
+        duplicated: str = "last"
     ):
         """
         Will fetch to attachments of mails based on the dates on arrival and the select modes
