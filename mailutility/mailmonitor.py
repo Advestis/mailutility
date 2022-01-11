@@ -2,6 +2,8 @@
 import imaplib
 import email
 import getpass
+
+from transparentpath import TransparentPath
 import chardet
 import sys
 import traceback
@@ -12,7 +14,7 @@ from time import sleep, time
 from pathlib import Path
 import numpy as np
 from typing import Union, List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, date
 from multiprocessing.pool import ThreadPool
 import logging
 
@@ -44,8 +46,8 @@ def get_datetime_now(fmt: str = "%d%m%Y %H:%M:%S") -> str:
 
     """
 
-    date = datetime.now()
-    return date.strftime(fmt)
+    d = datetime.now()
+    return d.strftime(fmt)
 
 
 # noinspection PyBroadException, PyUnresolvedReferences
@@ -276,7 +278,7 @@ class MailMonitor(object):
                     sleep(1)
 
     @staticmethod
-    def configure_date(date: Union[str, datetime]) -> str:
+    def configure_date(d: Union[str, datetime]) -> str:
         """
         Converts datetime format to mail date format
 
@@ -284,7 +286,7 @@ class MailMonitor(object):
 
         Parameters
         ----------
-        date : Union[str, datetime]
+        d : Union[str, datetime]
             date to convert
 
         Returns
@@ -292,8 +294,8 @@ class MailMonitor(object):
         str
             converted date
         """
-        if isinstance(date, str):
-            date = datetime.strptime(date, "%Y-%m-%d")
+        if isinstance(d, str):
+            d = datetime.strptime(d, "%Y-%m-%d")
         m_dict = {
             "01": "Jan",
             "02": "Feb",
@@ -308,15 +310,15 @@ class MailMonitor(object):
             "11": "Nov",
             "12": "Dec",
         }
-        if len(str(date.month)) == 1:
-            m = "0" + str(date.month)
+        if len(str(d.month)) == 1:
+            m = "0" + str(d.month)
         else:
-            m = str(date.month)
+            m = str(d.month)
         mv = m_dict[m]
-        return str(date.day) + "-" + mv + "-" + str(date.year)
+        return str(d.day) + "-" + mv + "-" + str(d.year)
 
     @staticmethod
-    def read_date(date: str) -> datetime.date:
+    def read_date(d: str) -> datetime.date:
         """
         convert date from mail format for datetime
 
@@ -324,7 +326,7 @@ class MailMonitor(object):
 
         Parameters
         ----------
-        date : str
+        d : str
             mail format
 
         Returns
@@ -345,18 +347,18 @@ class MailMonitor(object):
             "11": "Nov",
             "12": "Dec",
         }
-        day = date[:2]
+        day = d[:2]
         m_dict = {i: j for i, j in zip(m_dict.values(), m_dict.keys())}
-        month = m_dict[date[3:6]]
-        year = date[7:11]
-        date = datetime.strptime(year + "-" + month + "-" + day, "%Y-%m-%d")
-        return date.date()
+        month = m_dict[d[3:6]]
+        year = d[7:11]
+        d = datetime.strptime(year + "-" + month + "-" + day, "%Y-%m-%d")
+        return d.date()
 
     # noinspection PyUnresolvedReferences
     def monitor(
         self,
         conditions: Union[dict, List[dict]],
-        to_path: Union[Union["TransparentPath", Path, str], List[Union["TransparentPath", Path, str]]],
+        to_path: Union[Union[TransparentPath, Path, str], List[Union[TransparentPath, Path, str]]],
         time_to_sleep: Union[int, List[int]] = 60,
         mailbox: Union[str, List[str]] = "INBOX",
         overwrite: Union[bool, List[bool]] = None,
@@ -443,12 +445,12 @@ class MailMonitor(object):
 
     def fetch_one_mail(
         self,
-        save_dir: Union[str, Path],
+        save_dir: Union[str, Path, TransparentPath],
         state: Optional[str] = "ALL",
         subject: Optional[str] = None,
         sender: Optional[str] = None,
         body: Optional[str] = None,
-        date: Union[str, datetime, None] = None,
+        d: Union[str, datetime, date, None] = None,
         mailbox: Union[str, List[str]] = "INBOX",
         modes: Dict[str, str] = None
     ) -> Union[bool, tuple]:
@@ -460,8 +462,8 @@ class MailMonitor(object):
             subject=subject,
             sender=sender,
             body=body,
-            start_date=date,
-            end_date=date,
+            start_date=d,
+            end_date=d,
             mailbox=mailbox,
             modes=modes
         )
@@ -493,7 +495,7 @@ class MailMonitor(object):
 
     def fetch_mails(
             self,
-            save_dir: Union[str, Path],
+            save_dir: Union[str, Path, TransparentPath],
             state: Optional[str] = "ALL",
             subject: Optional[str] = None,
             sender: Optional[str] = None,
@@ -599,7 +601,10 @@ class MailMonitor(object):
         good_dates = [d for d in dates if (d >= best_start_date) and (d <= best_end_date)]
         good_dates.sort()
 
-        bp = Path(save_dir)
+        if not isinstance(save_dir, TransparentPath):
+            bp = TransparentPath(save_dir)
+        else:
+            bp = save_dir
         if not bp.exists():
             bp.mkdir()
 
@@ -609,21 +614,21 @@ class MailMonitor(object):
             for i_, j_ in self.fetch_attachment(uid_).items():
                 (path / i_).write_bytes(j_)
 
-        for date in good_dates:
-            if len(dict_date[date]) > 1:
+        for d in good_dates:
+            if len(dict_date[d]) > 1:
                 if duplicated == "last":
-                    uid = [dict_date[date][-1]]
+                    uid = [dict_date[d][-1]]
                 elif duplicated == "first":
-                    uid = [dict_date[date][0]]
+                    uid = [dict_date[d][0]]
                 else:
-                    uid = [dict_date[date]]
+                    uid = [dict_date[d]]
             else:
-                uid = [dict_date[date][0]]
+                uid = [dict_date[d][0]]
 
             bps = bp
             if len(good_dates) > 1:
-                logger.info(f"Found {len(uid)} mail(s) on {date}")
-                bps = bp / date.strftime('%Y-%m-%d')
+                logger.info(f"Found {len(uid)} mail(s) on {d}")
+                bps = bp / d.strftime('%Y-%m-%d')
             if len(uid) > 1:
                 for i in range(len(uid)):
                     save_one(bps.append(f"_{i}"), uid[i])
