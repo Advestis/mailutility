@@ -21,6 +21,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def login(username, password, server, port):
+    mail = imaplib.IMAP4_SSL(server, port)
+    mail.login(username, password)
+    mail.select()
+    return mail
+
+
 class MailException(Exception):
     """Any kind of mail error"""
 
@@ -262,10 +269,7 @@ class MailMonitor(object):
         while True:
             attempts += 1
             try:
-                self.mailbox = imaplib.IMAP4_SSL(self.hostname, self.port)
-                # Login to your account
-                self.mailbox.login(self.username, self.token)
-                self.mailbox.select()
+                self.mailbox = login(self.username, self.token, self.hostname, self.port)
                 if talk:
                     logger.info("...successful")
                 break
@@ -784,22 +788,25 @@ class MailMonitor(object):
 
     # noinspection PyUnresolvedReferences
     def send(self, msg):
-        new_message = email.message.Message()
-        new_message["From"] = f"{self.username}@{MailMonitor.default_mail}"
-        new_message["Subject"] = "MailMonitoring ended with Exception"
-        new_message.set_payload(msg)
-        self.open_connection()
-        self.mailbox.append(
-            "INBOX",
-            "",
-            imaplib.Time2Internaldate(time()),
-            str(new_message).encode(),
-        )
-        if not self.mailbox.state == "LOGOUT":
-            self.mailbox.select()
-            self.mailbox.close()
-            self.mailbox.logout()
-        logger.info(f"Sent warning message to {self.username}@{MailMonitor.default_mail}")
+        try:
+            new_message = email.message.Message()
+            new_message["From"] = f"{self.username}@{MailMonitor.default_mail}"
+            new_message["Subject"] = "MailMonitoring ended with Exception"
+            new_message.set_payload(msg)
+            self.open_connection()
+            self.mailbox.append(
+                "INBOX",
+                "",
+                imaplib.Time2Internaldate(time()),
+                str(new_message).encode(),
+            )
+            if not self.mailbox.state == "LOGOUT":
+                self.mailbox.select()
+                self.mailbox.close()
+                self.mailbox.logout()
+            logger.info(f"Sent warning message to {self.username}@{MailMonitor.default_mail}")
+        except self.mailbox.abort:
+            logger.warning("imaplib.abort exception raised. Attempting to reconnect.")
 
 
 _excepthook = getattr(sys, "excepthook")
