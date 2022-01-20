@@ -790,7 +790,6 @@ class MailMonitor(object):
 
         the_while(self, timeout)
 
-    # noinspection PyUnresolvedReferences
     def send(self, msg, to: str = None):
         attempts = 0
         while attempts < 2:
@@ -798,10 +797,12 @@ class MailMonitor(object):
             try:
                 mailsender = MailSender(sender=self.username, passwd=self.token)
                 if to is None:
-                    mailsender.send(adresses=self.username, subject="MailMonitoring ended with Exception", text=msg)
+                    mailsender.send_mail(
+                        adresses=self.username, subject="MailMonitoring ended with Exception", text=msg
+                    )
                     logger.info(f"Sent warning message to {self.username}")
                 else:
-                    mailsender.send(adresses=to, subject="MailMonitoring ended with Exception", text=msg)
+                    mailsender.send_mail(adresses=to, subject="MailMonitoring ended with Exception", text=msg)
                     logger.info(f"Sent warning message to {to}")
                 break
             except self.mailbox.abort:
