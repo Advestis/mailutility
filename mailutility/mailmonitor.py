@@ -633,9 +633,11 @@ class MailMonitor(object):
 
             if isinstance(expected_attachments, bool):
                 if expected_attachments is True and attachments == 0:
-                    raise ValueError("Expected attachments in the mail, but found none.")
+                    logger.warning("Expected attachments in the mail, but found none.")
+                    return False, None
             elif isinstance(expected_attachments, int) and attachments != expected_attachments:
-                raise ValueError(f"Expected {expected_attachments} attachments in the mail, but found {attachments}.")
+                logger.warning(f"Expected {expected_attachments} attachments in the mail, but found {attachments}.")
+                return False, None
 
         for d in good_dates:
             if len(dict_date[d]) > 1:
