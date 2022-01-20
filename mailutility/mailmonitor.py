@@ -18,6 +18,8 @@ from datetime import datetime, date as ddate
 from multiprocessing.pool import ThreadPool
 import logging
 
+from .mailsender import MailSender
+
 logger = logging.getLogger(__name__)
 
 
@@ -236,6 +238,7 @@ class MailMonitor(object):
         connect: bool = False,
         overwrite: bool = True,
         max_threads: int = None,
+        send_errors_to: str = None
     ):
 
         if username is None:
@@ -245,6 +248,7 @@ class MailMonitor(object):
         if "@" not in username:
             username = f"{username}@{MailMonitor.default_mail}"
 
+        self.send_errors_to = send_errors_to
         self.username = username
         self.token = token
         self.port = port
@@ -787,26 +791,23 @@ class MailMonitor(object):
         the_while(self, timeout)
 
     # noinspection PyUnresolvedReferences
-    def send(self, msg):
-        try:
-            new_message = email.message.Message()
-            new_message["From"] = f"{self.username}@{MailMonitor.default_mail}"
-            new_message["Subject"] = "MailMonitoring ended with Exception"
-            new_message.set_payload(msg)
-            self.open_connection()
-            self.mailbox.append(
-                "INBOX",
-                "",
-                imaplib.Time2Internaldate(time()),
-                str(new_message).encode(),
-            )
-            if not self.mailbox.state == "LOGOUT":
-                self.mailbox.select()
-                self.mailbox.close()
-                self.mailbox.logout()
-            logger.info(f"Sent warning message to {self.username}@{MailMonitor.default_mail}")
-        except self.mailbox.abort:
-            logger.warning("imaplib.abort exception raised. Attempting to reconnect.")
+    def send(self, msg, to: str = None):
+        attempts = 0
+        while attempts < 2:
+            # noinspection PyBroadException
+            try:
+                mailsender = MailSender(sender=self.username, passwd=self.token)
+                if to is None:
+                    mailsender.send(adresses=self.username, subject="MailMonitoring ended with Exception", text=msg)
+                    logger.info(f"Sent warning message to {self.username}")
+                else:
+                    mailsender.send(adresses=to, subject="MailMonitoring ended with Exception", text=msg)
+                    logger.info(f"Sent warning message to {to}")
+                break
+            except self.mailbox.abort:
+                logger.warning("imaplib.abort exception raised. Attempting to reconnect.")
+                self.mailbox = login(self.username, self.token, self.hostname, self.port)
+                attempts += 1
 
 
 _excepthook = getattr(sys, "excepthook")
@@ -833,7 +834,7 @@ def overload_raise(ex, val, tb):
         li = traceback.format_exception(ex, val, tb)
         to_send = "".join(li)
         for mm in MailMonitor.instances:
-            mm.send(to_send)
+            mm.send(to_send, to=mm.send_errors_to)
         _excepthook(ex, val, tb)
     else:
         sys.exit(0)
