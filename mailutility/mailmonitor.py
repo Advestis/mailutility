@@ -239,6 +239,7 @@ class MailMonitor(object):
         overwrite: bool = True,
         max_threads: int = None,
         send_errors_to: str = None
+
     ):
 
         if username is None:
@@ -460,7 +461,8 @@ class MailMonitor(object):
         body: Optional[str] = None,
         date: Union[str, datetime, ddate, None] = None,
         mailbox: Union[str, List[str]] = "INBOX",
-        modes: Dict[str, str] = None
+        modes: Dict[str, str] = None,
+        expected_attachments: Union[int, bool] = True
     ) -> Union[bool, tuple]:
         if modes is None:
             modes = {"start": "exact", "end": "exact"}
@@ -473,7 +475,8 @@ class MailMonitor(object):
             start_date=date,
             end_date=date,
             mailbox=mailbox,
-            modes=modes
+            modes=modes,
+            expected_attachments=expected_attachments
         )
 
     def fetch_attachment(self, uid: str) -> dict:
@@ -512,7 +515,8 @@ class MailMonitor(object):
         end_date: Union[str, datetime, None] = None,
         mailbox: Union[str, List[str]] = "INBOX",
         modes: Dict[str, str] = None,
-        duplicated: str = "last"
+        duplicated: str = "last",
+        expected_attachments: Union[int, bool] = True
     ):
         """
         Will fetch to attachments of mails based on the dates on arrival and the select modes
@@ -531,6 +535,9 @@ class MailMonitor(object):
             keys are 'start' and 'end', values can be 'exact', 'nearest', 'next', 'last'
         duplicated : str = "last" ("first", "last", "all")
             What to do if there are several mails the same day
+        expected_attachments: Union[int, bool]
+            Can be True to tell the function that it should raise an error if no attachment is found in the mail. Can
+            also be an integer to tell the exact number of expected attachments (Default value = False)
 
         Returns
         -------
@@ -619,8 +626,16 @@ class MailMonitor(object):
         def save_one(path, uid_):
             if not path.exists():
                 path.mkdir()
+            attachments = 0
             for i_, j_ in self.fetch_attachment(uid_).items():
                 (path / i_).write_bytes(j_)
+                attachments += 1
+
+            if isinstance(expected_attachments, bool):
+                if expected_attachments is True and attachments == 0:
+                    raise ValueError("Expected attachments in the mail, but found none.")
+            elif isinstance(expected_attachments, int) and attachments != expected_attachments:
+                raise ValueError(f"Expected {expected_attachments} attachments in the mail, but found {attachments}.")
 
         for d in good_dates:
             if len(dict_date[d]) > 1:
