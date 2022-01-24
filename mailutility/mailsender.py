@@ -43,7 +43,7 @@ class MailSender(object):
 
         """
 
-    hostname = ""
+    hostname = "outlook.office365.com"
     default_mail = ""
 
     def __init__(self, sender: str = None, passwd: str = None, do_raise: bool = True):
