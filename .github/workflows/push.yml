@@ -30,6 +30,7 @@ jobs:
 
       - name: make doc
         run: |
+          pip install -r requirements.txt
           pip3 install pdoc3
           pdoc --force --html -o docs mailutility
           mv docs/mailutility/* docs/
