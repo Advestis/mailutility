@@ -26,13 +26,14 @@ jobs:
       - name: build
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools
-          pip install .
           python setup.py sdist
 
       - name: make doc
         run: |
-          make doc
+          pip3 install pdoc3
+          pdoc --force --html -o docs mailutility
+          mv docs/mailutility/* docs/
+          rm -r docs/mailutility
 
       - name: commit doc
         run: |
