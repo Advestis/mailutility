@@ -86,10 +86,13 @@ if version is None:
             version = vfile.readline().split("= ")[-1]
     except Exception as e:
         version = None
+        
 if "v" in version:
     version = version.replace("v", "")
 if "-" in version:
     version = version.replace("-", "")
+if "\"" in version:
+    version = version.replace("\"", "")
 
 
 if __name__ == "__main__":
