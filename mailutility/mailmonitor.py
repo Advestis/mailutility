@@ -278,7 +278,7 @@ class MailMonitor(object):
                 if talk:
                     logger.info("...successful")
                 break
-            except socket.gaierror as e:
+            except (socket.gaierror, socket.error) as e:
                 logger.info(f"Failed more than {attempts} times. Raising the exception.")
                 if attempts > 60:
                     raise e
