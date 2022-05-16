@@ -243,11 +243,15 @@ class MailSender(object):
 
         # Attach files if any
         for filepath in files:
+            if type(filepath) == str:
+                name = Path(filepath).name
+            else:
+                name = filepath.name
             with open(filepath, "rb") as fil:
                 part = MIMEBase("application", "octet-stream")
                 part.set_payload(fil.read())
                 encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f'attachment; filename="{filepath.name}"')
+            part.add_header("Content-Disposition", f'attachment; filename="{name}"')
             message.attach(part)
 
         refused = self.smtp.sendmail(self.sender, adresses, message.as_string())
