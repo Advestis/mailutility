@@ -86,9 +86,9 @@ class MailSender(object):
         if self.sender is not None and self.passwd is not None and self.smtp is not None:
             if MailSender.hostname is None:
                 if self.do_raise:
-                    raise ValueError("You must specify the histname attribute of MailSender (like "
+                    raise ValueError("You must specify the hostname attribute of MailSender (like "
                                      "outlook.office365.com for example)")
-                logger.error("You must specify the histname attribute of MailSender (like outlook.office365.com for "
+                logger.error("You must specify the hostname attribute of MailSender (like outlook.office365.com for "
                              "example)")
                 return False
 
